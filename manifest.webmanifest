@@ -1,0 +1,21 @@
+{
+  "name": "POWER AI WEBSITE",
+  "short_name": "POWER AI",
+  "description": "Schema.org 30.0 intelligence platform with secure accounts, search, developer tools and analytics.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#030914",
+  "theme_color": "#06111f",
+  "categories": ["developer", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/power-ai-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

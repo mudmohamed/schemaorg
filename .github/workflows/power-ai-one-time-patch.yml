@@ -1,0 +1,51 @@
+name: POWER AI one-time final patch
+on:
+  push:
+    paths:
+      - .github/workflows/power-ai-one-time-patch.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch verified POWER AI UI
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          old='''<div class="chart"><svg viewBox="0 0 520 160" preserveAspectRatio="none"><defs><linearGradient id="a" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#765aff" stop-opacity=".55"/><stop offset="1" stop-color="#0d67ff" stop-opacity="0"/></linearGradient></defs><polygon fill="url(#a)" points="0,135 55,112 105,122 160,75 215,99 270,68 330,98 385,58 440,88 520,32 520,160 0,160"/><polyline fill="none" stroke="#765aff" stroke-width="4" points="0,135 55,112 105,122 160,75 215,99 270,68 330,98 385,58 440,88 520,32"/></svg></div>'''
+          s=s.replace(old,'<div class="chart" id="dashChart"></div>')
+          old2='''<div class="chart"><svg viewBox="0 0 520 190" preserveAspectRatio="none"><polyline fill="none" stroke="#775cff" stroke-width="4" points="0,160 55,130 110,141 165,93 220,110 275,78 330,104 385,59 440,82 520,36"/></svg></div>'''
+          s=s.replace(old2,'<div class="chart" id="analyticsChart"></div>')
+          needle="function color(i){return['#1b82ff','#24b894','#ff6d3a','#e94b93','#3ca2ff','#ee4ca4','#744aff','#15b8d6'][i%8]}\n"
+          insert=needle+'''function activitySVG(events){const days=[];for(let i=9;i>=0;i--){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-i);days.push({d,key:d.toISOString().slice(0,10),n:0})}for(const e of events||[]){const k=new Date(e.created_at).toISOString().slice(0,10),x=days.find(v=>v.key===k);if(x)x.n++}const max=Math.max(1,...days.map(x=>x.n)),pts=days.map((x,i)=>`${i*(520/9)},${150-(x.n/max)*118}`).join(' ');return `<svg viewBox="0 0 520 160" preserveAspectRatio="none"><defs><linearGradient id="activityArea" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#765aff" stop-opacity=".5"/><stop offset="1" stop-color="#0d67ff" stop-opacity="0"/></linearGradient></defs><polygon fill="url(#activityArea)" points="${pts} 520,160 0,160"/><polyline fill="none" stroke="#765aff" stroke-width="4" points="${pts}"/></svg>`}\nfunction drawActivity(events,id){const e=$('#'+id);if(e)e.innerHTML=activitySVG(events)}\n'''
+          s=s.replace(needle,insert)
+          start=s.index('function profileView(){')
+          end=s.index('\nfunction adminShell(){', start)
+          new_profile='''function profileView(){return`<div class="panel"><div class="ph"><h3>User Profile / Settings</h3><span>${esc(S.profile?.role||'Secure account')}</span></div><div class="pb profileGrid"><div class="profileNav"><button class="active" data-ptab="profile">Profile</button><button data-ptab="security">Security</button><button data-ptab="notifications">Notifications</button><button data-ptab="apikeys">API Keys</button><button data-ptab="appearance">Appearance</button><button data-ptab="billing">Billing</button></div><div id="profilePane">${profilePane('profile')}</div></div></div>`}\nfunction profilePane(tab){if(tab==='profile')return`<div class="field"><label>Full Name</label><input id="pName" value="${esc(S.profile?.display_name||'')}"></div><div class="field"><label>Login Email</label><input value="${esc(S.session?.user?.email||'')}" disabled></div><div class="field"><label>Bio</label><textarea id="pBio" rows="5">${esc(S.profile?.bio||'')}</textarea></div><div class="actions"><button class="smallBtn" id="saveProfile">Save Changes</button><button class="smallBtn danger" id="logout">Log out</button></div>`;if(tab==='security')return`<div class="adminStats"><div class="adminCard"><strong>Active</strong><span>Secure Session</span></div><div class="adminCard"><strong>${esc(S.profile?.role||'user')}</strong><span>Server Role</span></div><div class="adminCard"><strong>RLS</strong><span>Row Security</span></div><div class="adminCard"><strong>HTTPS</strong><span>Transport</span></div></div><p class="detailText">Your password is handled by the authentication backend and is not stored in this page. Role changes are server-restricted.</p><div class="actions"><button class="smallBtn danger" id="logout">End This Session</button></div>`;if(tab==='notifications'){const on=localStorage.getItem('power_ai_notifications')!=='off';return`<h3>Notifications</h3><p class="detailText">Control in-app success and status notifications on this device.</p><label class="chip"><input type="checkbox" id="notifToggle" ${on?'checked':''}> Enable in-app notifications</label>`}if(tab==='apikeys')return`<h3>API Keys</h3><p class="detailText">No private API secret is exposed in the browser. The built-in API Explorer queries the archive-verified Schema.org 30.0 dataset directly. Authenticated backend calls use your temporary session token automatically.</p><div class="actions"><button class="smallBtn" data-jump="tools">Open API Explorer</button></div>`;if(tab==='appearance')return`<h3>Appearance</h3><p class="detailText">The approved dark neon blue/purple POWER AI design is locked so the visual system does not change unexpectedly.</p><span class="sourceSeal">✓ DESIGN LOCK ACTIVE</span>`;return`<h3>Billing</h3><p class="detailText">This deployment currently has no in-app paid billing product configured, so there are no charges or payment methods managed inside POWER AI WEBSITE.</p>`}\n'''
+          s=s[:start]+new_profile+s[end:]
+          pos=s.index('function analyticsShell(){')
+          devhelper='''function developerAction(i){const x=term(S.selected)||term('Person');if(i===0){$('#devTitle').textContent='Documentation · '+x.name;$('#devCode').textContent=JSON.stringify({name:x.name,kind:x.kind,comment:x.text,parent:x.kind==='Class'?listOf(x.subTypeOf):listOf(x.subPropertyOf),children:x.kind==='Class'?listOf(x.subTypes):listOf(x.subproperties)},null,2);return}if(i===4){$('#devTitle').textContent='Working Example · '+x.name;$('#devCode').textContent=JSON.stringify(templateFor(x.kind==='Class'?x.name:'Thing'),null,2);return}const map={1:'jsonld',2:'turtle',3:'api',5:'validate'};if(map[i]){switchView('tools');openTool(map[i]);if((i===1||i===3)&&$('#tType'))$('#tType').value=x.kind==='Class'?x.name:'Thing';if(i===3&&$('#tQuery'))$('#tQuery').value=x.name}}\n'''
+          s=s[:pos]+devhelper+s[pos:]
+          needle="$$('[data-jump]').forEach(b=>b.onclick=()=>switchView(b.dataset.jump));"
+          repl=needle+"$$('[data-cat]').forEach(b=>b.onclick=()=>doQ(b.dataset.cat));$$('[data-dev]').forEach(b=>b.onclick=()=>developerAction(Number(b.dataset.dev)));$$('[data-ptab]').forEach(b=>b.onclick=()=>{const tab=b.dataset.ptab;$$('[data-ptab]').forEach(x=>x.classList.toggle('active',x===b));$('#profilePane').innerHTML=profilePane(tab);bindDynamic();if(tab==='notifications'&&$('#notifToggle'))$('#notifToggle').onchange=e=>{localStorage.setItem('power_ai_notifications',e.target.checked?'on':'off');toast('Notification preference saved.')}});"
+          s=s.replace(needle,repl)
+          old="$$('[data-open]').forEach(b=>b.onclick=()=>{S.selected=b.dataset.open;const t=term(S.selected);if(S.view==='explorer'){document.querySelector('#termDetail').innerHTML=termDetail(t);bindDynamic()}else{S.filter=t?.kind==='Property'?'Property':'Class';$('#view-explorer').innerHTML=explorer();bindDynamic();switchView('explorer')}});"
+          new="$$('[data-open]').forEach(b=>b.onclick=()=>{S.selected=b.dataset.open;const t=term(S.selected);if(S.view==='graph'){$('#view-graph').innerHTML=graphView();bindDynamic();return}if(S.view==='explorer'){document.querySelector('#termDetail').innerHTML=termDetail(t);bindDynamic()}else{S.filter=t?.kind==='Property'?'Property':'Class';$('#view-explorer').innerHTML=explorer();bindDynamic();switchView('explorer')}});"
+          s=s.replace(old,new)
+          s=s.replace("function toast(m){const t=$('#toast');t.textContent=m;t.classList.remove('hidden');clearTimeout(window.__tt);window.__tt=setTimeout(()=>t.classList.add('hidden'),3500)}","function toast(m){if(localStorage.getItem('power_ai_notifications')==='off')return;const t=$('#toast');t.textContent=m;t.classList.remove('hidden');clearTimeout(window.__tt);window.__tt=setTimeout(()=>t.classList.add('hidden'),3500)}")
+          s=s.replace("rest('activity_events?select=id,event_name&limit=1000')","rest('activity_events?select=id,event_name,created_at&order=created_at.asc&limit=1000')")
+          s=s.replace("$('#dTools')&&($('#dTools').textContent=r.length)}catch{}","$('#dTools')&&($('#dTools').textContent=r.length);drawActivity(e,'dashChart')}catch{}")
+          s=s.replace("$('#anSaved').textContent=s.length;$('#activityList').innerHTML=", "$('#anSaved').textContent=s.length;drawActivity(e,'analyticsChart');$('#activityList').innerHTML=")
+          p.write_text(s)
+          PY
+          node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const m=h.match(/<script>([\\s\\S]*?)<\\/script>/);new Function(m[1]);console.log('POWER AI syntax OK')"
+          git config user.name "POWER AI Builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "Finish real POWER AI interactions and activity charts"
+          git push
